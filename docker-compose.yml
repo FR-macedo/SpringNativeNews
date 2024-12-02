@@ -25,5 +25,58 @@ services:
     ports:
       - "8080:8080"
 
+  zabbix-server:
+    image: zabbix/zabbix-server-mysql:alpine-6.4-latest
+    restart: unless-stopped
+    environment:
+      - DB_SERVER_HOST=zabbix-mysql
+      - MYSQL_DATABASE=zabbix
+      - MYSQL_USER=zabbix
+      - MYSQL_PASSWORD=zabbix_password
+    depends_on:
+      - zabbix-mysql
+    ports:
+      - "10051:10051"
+
+  zabbix-mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=zabbix
+      - MYSQL_USER=zabbix
+      - MYSQL_PASSWORD=zabbix_password
+      - MYSQL_ROOT_PASSWORD=root_password
+    volumes:
+      - zabbix-mysql-data:/var/lib/mysql
+
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-mysql:alpine-6.4-latest
+    restart: unless-stopped
+    environment:
+      - DB_SERVER_HOST=zabbix-mysql
+      - MYSQL_DATABASE=zabbix
+      - MYSQL_USER=zabbix
+      - MYSQL_PASSWORD=zabbix_password
+      - PHP_TZ=America/Sao_Paulo
+    depends_on:
+      - zabbix-server
+      - zabbix-mysql
+    ports:
+      - "8090:8080"
+
+  zabbix-agent:
+    image: zabbix/zabbix-agent:alpine-6.4-latest
+    restart: unless-stopped
+    environment:
+      - ZBX_HOSTNAME=docker-host
+      - ZBX_SERVER_HOST=zabbix-server
+    depends_on:
+      - zabbix-server
+    privileged: true
+    volumes:
+      - /proc:/proc
+      - /sys:/sys
+      - /dev:/dev
+
 volumes:
   mysql-data:
+  zabbix-mysql-data:
