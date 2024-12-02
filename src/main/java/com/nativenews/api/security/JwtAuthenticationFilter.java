@@ -6,19 +6,19 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Collections;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final String secretKey; // Injetar a chave secreta do JWT
+    private final String jwtSecret;
 
-    public JwtAuthenticationFilter(String secretKey) {
-        this.secretKey = secretKey;
+    public JwtAuthenticationFilter(String jwtSecret) {
+        this.jwtSecret = jwtSecret;
     }
 
     @Override
@@ -33,14 +33,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = authorizationHeader.substring(7);
 
             try {
-                Claims claims = Jwts.parser()
-                        .setSigningKey(secretKey)
+                Claims claims = Jwts.parserBuilder()
+                        .setSigningKey(jwtSecret.getBytes()) // Consistência com JwtService
+                        .build()
                         .parseClaimsJws(token)
                         .getBody();
 
                 String userId = claims.getSubject();
 
-                // Criar autenticação para o Spring Security
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 userId,
@@ -48,11 +48,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 Collections.emptyList()
                         );
 
-                // Definir autenticação no contexto de segurança
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
             } catch (Exception e) {
-                // Token inválido
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 return;
             }

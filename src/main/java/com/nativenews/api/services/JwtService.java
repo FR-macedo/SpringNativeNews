@@ -1,12 +1,9 @@
 package com.nativenews.api.services;
 
-
 import com.nativenews.api.domain.model.User;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.stereotype.Service;
 
 import java.security.Key;
 import java.util.Date;
@@ -14,8 +11,13 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
+    private final String jwtSecret;
+    private final long jwtExpiration;
+
+    public JwtService(String jwtSecret, long jwtExpiration) {
+        this.jwtSecret = jwtSecret;
+        this.jwtExpiration = jwtExpiration;
+    }
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
@@ -23,19 +25,25 @@ public class JwtService {
 
     public String generateToken(User user) {
         return Jwts.builder()
-                .setSubject(user.getUsername())  // Define o usuário do token
-                .setIssuedAt(new Date())         // Data de criação do token
-                .setExpiration(new Date(System.currentTimeMillis() + 86400000)) // Expira em 24h
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256) // Assina com chave HMAC-SHA256
-                .compact(); // Gera a string compacta do token
+                .setSubject(user.getUsername())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
     }
 
     public String validateTokenAndGetUsername(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())  // Usa a mesma chave para verificar
-                .build()
-                .parseClaimsJws(token)           // Valida o token
-                .getBody()                       // Obtém o corpo do token
-                .getSubject();                   // Retorna o nome do usuário
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getSubject();
+        } catch (ExpiredJwtException e) {
+            throw new RuntimeException("Token expirado", e);
+        } catch (JwtException e) {
+            throw new RuntimeException("Token inválido", e);
+        }
     }
 }
